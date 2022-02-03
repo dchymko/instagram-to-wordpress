@@ -25,50 +25,54 @@ class Custom_Commands {
     function media( $args, $assoc_args ) {
         $postsFile = $args[ 0 ];
         $posts = json_decode( file_get_contents( $postsFile ) );
-        $posts = array_slice( $posts, 0, 1);
         $itemsProcessed = 1;
         foreach( $posts as $post ) {
             $title = $post->title;
             $taken = $post->creation_timestamp;
             $images = [];
-            //Get the medai items to add to the post
+            //Get the media items to add to the post
             foreach( $post->media as $mediaItem ) {
                 if (! isset( $title ) ) {
                     $title = $mediaItem->title;
                 }
                 if (! isset( $taken ) ) {
-                    $title = $mediaItem->creation_timestamp;
+                    $taken = $mediaItem->creation_timestamp;
                 }
                 $images[] = [ 'uri' => $mediaItem->uri ];
             }
 
+            $dt = new DateTime();
+            $dt->setTimestamp($taken);
+            $postTitle = $dt->format('Y-m-d');
             //Create an actual post
-            $postId = Importer::createPost( $title, '');
+            $postId = Importer::createPost( $postTitle, '');
 
             //Now we can actually upload and attach the files
             $attachments = [];
+            $mediaCount = 0;
             foreach( $images as $mediaItem ) {
+                $mediaCount++;
+                WP_CLI::success( sprintf( 'Processing Media Item: %d', $mediaCount) );
                 $mediaFilePath = dirname(__FILE__) . '//export//' . $mediaItem['uri'];
                 $upload_file = wp_upload_bits( basename( $mediaFilePath ), null, file_get_contents( $mediaFilePath ) );
-                $attachId = Importer::importFileAsAttachment( $upload_file[ 'file' ], $upload_file[ 'type' ], $postId );
-                $attachments[] = $attachId;
+                $attachId = Importer::importFileAsAttachment( $upload_file[ 'file' ], $upload_file[ 'type' ], $postId, $postTitle );
             }
             $post_content = "";
             foreach( $attachments as $attachment ) {
                 $image_data = wp_get_attachment_image_src( $attachment, 'full' );
                 $post_content .= '<!-- wp:image --><figure class="wp-block-image"><img src="' . $image_data[0]. '"/></figure><!-- /wp:image -->';
             }
-            
+
             wp_update_post( array(
                 'ID'           => $postId,
                 'post_content' => $post_content,
             ) );
 
-            WP_CLI::line( sprintf( 'Procesed media item %d', $itemsProcessed) );
             $itemsProcessed++;
+            WP_CLI::success( sprintf( 'Created a new Post: %s', $postTitle) );
         }
         if($media === false) die("Could not open and/or parse $instagram_backup_path/content/posts_1.json");
-        WP_CLI::success( sprintf( 'Did the thing for post to work %d', 2) );
+
     }
 
 }
@@ -89,15 +93,18 @@ class Importer {
         return $post;
     }
 
-    static function importFileAsAttachment( $filePath, $fileType, $parent_postId = null ) {
+    static function importFileAsAttachment( $filePath, $fileType, $parent_postId = null, $postTitle ) {
 
         $filetype = wp_check_filetype( basename( $filePath ), null );
 
+
+        $mediaTitle = 'media-' . $postTitle . '-' . rand(10000,99999);
+
         // Prepare an array of post data for the attachment.
         $attachment = array(
-            'guid'           => $wp_upload_dir['url'] . '/' . basename( $filePath ),
+            'guid'           => $mediaTitle,
             'post_mime_type' => $fileType,
-            'post_title'     => preg_replace( '/\.[^.]+$/', '', basename( $filePath ) ),
+            'post_title'     => $mediaTitle,
             'post_content'   => '',
             'post_status'    => 'inherit'
         );
