@@ -17,9 +17,7 @@
 * License URI: https://www.gnu.org/licenses/gpl-2.0.html
 *
  */
-if ( ! WP_CLI ) {
-	return;
-}
+
 class Custom_Commands {
 
     function media( $args, $assoc_args ) {
@@ -53,7 +51,7 @@ class Custom_Commands {
             foreach( $images as $mediaItem ) {
                 $mediaCount++;
                 WP_CLI::success( sprintf( 'Processing Media Item: %d', $mediaCount) );
-                $mediaFilePath = dirname(__FILE__) . '//export//' . $mediaItem['uri'];
+                $mediaFilePath = dirname(__FILE__) . '/export/' . $mediaItem['uri'];
                 $upload_file = wp_upload_bits( basename( $mediaFilePath ), null, file_get_contents( $mediaFilePath ) );
                 $attachId = Importer::importFileAsAttachment( $upload_file[ 'file' ], $upload_file[ 'type' ], $postId, $postTitle );
             }
@@ -62,6 +60,8 @@ class Custom_Commands {
                 $image_data = wp_get_attachment_image_src( $attachment, 'full' );
                 $post_content .= '<!-- wp:image --><figure class="wp-block-image"><img src="' . $image_data[0]. '"/></figure><!-- /wp:image -->';
             }
+	
+	    $post_content .= '<!-- wp:paragraph --><p>' . $title . '</p><!-- /wp:paragraph -->'
 
             wp_update_post( array(
                 'ID'           => $postId,
